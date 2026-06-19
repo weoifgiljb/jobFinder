@@ -1,0 +1,4 @@
+plugins/*/out/
+plugins/*/out-*/
+*.pyc
+__pycache__/

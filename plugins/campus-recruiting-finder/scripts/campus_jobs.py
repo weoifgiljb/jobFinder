@@ -22,7 +22,7 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 
 USER_AGENT = (
@@ -87,6 +87,32 @@ class Lead:
     status: str = "needs verification"
     confidence: int = 0
     collected_at: str = ""
+
+
+@dataclass
+class SearchConfig:
+    graduation_years: list[str]
+    roles: list[str]
+    cities: list[str]
+    industries: list[str]
+    target_companies: list[str]
+    company_aliases: dict[str, list[str]]
+    keywords: list[str]
+    must_have_keywords: list[str]
+    nice_to_have_keywords: list[str]
+    exclude_keywords: list[str]
+    degrees: list[str]
+    employment_types: list[str]
+    source_sites: list[str]
+    direct_urls: list[str]
+    languages: list[str]
+    include_internships: bool
+    include_reposts: bool
+    remote_ok: bool
+    min_confidence: int
+    limit_per_query: int
+    max_queries: int
+    output_dir: str
 
 
 class LinkExtractor(HTMLParser):
@@ -174,6 +200,174 @@ def search_bing(query: str, limit: int) -> list[Lead]:
         if len(leads) >= limit:
             break
     return leads
+
+
+def load_config(path: Path) -> SearchConfig:
+    raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(raw, dict):
+        raise ValueError("config JSON must be an object")
+    filters = raw.get("filters") or {}
+    sources = raw.get("sources") or {}
+    output = raw.get("output") or {}
+    return SearchConfig(
+        graduation_years=list_of_strings(filters.get("graduation_years")),
+        roles=list_of_strings(filters.get("roles")),
+        cities=list_of_strings(filters.get("cities")),
+        industries=list_of_strings(filters.get("industries")),
+        target_companies=list_of_strings(filters.get("target_companies")),
+        company_aliases=dict_of_string_lists(filters.get("company_aliases")),
+        keywords=list_of_strings(filters.get("keywords")),
+        must_have_keywords=list_of_strings(filters.get("must_have_keywords")),
+        nice_to_have_keywords=list_of_strings(filters.get("nice_to_have_keywords")),
+        exclude_keywords=list_of_strings(filters.get("exclude_keywords")),
+        degrees=list_of_strings(filters.get("degrees")),
+        employment_types=list_of_strings(filters.get("employment_types")),
+        source_sites=list_of_strings(sources.get("sites")),
+        direct_urls=list_of_strings(sources.get("direct_urls")),
+        languages=list_of_strings(raw.get("languages")) or ["zh", "en"],
+        include_internships=bool(filters.get("include_internships", False)),
+        include_reposts=bool(filters.get("include_reposts", True)),
+        remote_ok=bool(filters.get("remote_ok", False)),
+        min_confidence=int(output.get("min_confidence", 35)),
+        limit_per_query=int(output.get("limit_per_query", 12)),
+        max_queries=int(output.get("max_queries", 80)),
+        output_dir=str(output.get("dir") or "out"),
+    )
+
+
+def list_of_strings(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def dict_of_string_lists(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, list[str]] = {}
+    for key, raw_items in value.items():
+        clean_key = str(key).strip()
+        if clean_key:
+            result[clean_key] = list_of_strings(raw_items)
+    return result
+
+
+def queries_from_config(config: SearchConfig) -> list[str]:
+    role_terms = config.roles or [""]
+    city_terms = config.cities or [""]
+    year_terms = config.graduation_years or [""]
+    industry_terms = config.industries or [""]
+    company_terms = config.target_companies or [""]
+    extra_keywords = list(config.keywords)
+    extra_keywords.extend(config.must_have_keywords)
+    campus_terms = ["校招", "应届生"] if "zh" in config.languages else []
+    if "en" in config.languages:
+        campus_terms.extend(["new grad", "campus recruitment", "early career"])
+    if config.include_internships:
+        campus_terms.extend(["实习转正", "internship"])
+    if config.remote_ok:
+        extra_keywords.extend(["remote", "远程"])
+
+    queries: list[str] = []
+    for role in role_terms:
+        for city in city_terms:
+            for year in year_terms:
+                base_parts = [role, year, city]
+                for campus_term in campus_terms or ["campus recruiting"]:
+                    queries.append(compact_query([*base_parts, campus_term, *extra_keywords]))
+                for company in company_terms:
+                    if company:
+                        company_terms_for_query = [company, *config.company_aliases.get(company, [])]
+                        for company_term in company_terms_for_query:
+                            queries.append(compact_query([company_term, *base_parts, "招聘", "career"]))
+                for industry in industry_terms:
+                    if industry:
+                        queries.append(compact_query([industry, *base_parts, "校招"]))
+    for site in config.source_sites:
+        for role in role_terms:
+            for year in year_terms:
+                queries.append(compact_query([f"site:{site}", role, year, "校招 OR new grad"]))
+
+    seen: set[str] = set()
+    result: list[str] = []
+    for query in queries:
+        if query and query not in seen:
+            seen.add(query)
+            result.append(query)
+        if len(result) >= config.max_queries:
+            break
+    return result
+
+
+def compact_query(parts: Iterable[str]) -> str:
+    seen: set[str] = set()
+    clean_parts: list[str] = []
+    for part in parts:
+        if not part or not part.strip():
+            continue
+        normalized = part.strip()
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        clean_parts.append(normalized)
+    return " ".join(clean_parts)
+
+
+def lead_matches_config(lead: Lead, config: SearchConfig) -> bool:
+    haystack = f"{lead.title} {lead.url} {lead.snippet} {lead.company} {lead.role} {lead.city}".lower()
+    if lead.confidence < config.min_confidence:
+        return False
+    if not config.include_reposts and any(hint in haystack for hint in REPOST_HINTS):
+        return False
+    if config.exclude_keywords and any(term.lower() in haystack for term in config.exclude_keywords):
+        return False
+    if config.cities and not config.remote_ok:
+        city_match = any(city.lower() in haystack for city in config.cities)
+        if lead.city:
+            city_match = city_match or lead.city in config.cities
+        if not city_match and not any(term in haystack for term in ["全国", "多地", "remote", "远程"]):
+            return False
+    if config.target_companies and not any(company.lower() in haystack for company in config.target_companies):
+        aliases = []
+        for company in config.target_companies:
+            aliases.extend(config.company_aliases.get(company, []))
+            aliases.append(domain_company(company))
+        if not any(alias.lower() in haystack for alias in aliases):
+            return False
+    if config.roles and not any(role.lower() in haystack for role in config.roles):
+        if not any(term.lower() in haystack for term in config.must_have_keywords):
+            return False
+    if config.must_have_keywords and not all(term.lower() in haystack for term in config.must_have_keywords):
+        return False
+    if config.degrees and not any(degree.lower() in haystack for degree in config.degrees):
+        if not any(term in haystack for term in ["本科", "硕士", "博士", "bachelor", "master", "phd"]):
+            return False
+    if config.employment_types and not any(item.lower() in haystack for item in config.employment_types):
+        if not any(term in haystack for term in ["全职", "full-time", "full time", "校招", "new grad"]):
+            return False
+    if config.nice_to_have_keywords and any(term.lower() in haystack for term in config.nice_to_have_keywords):
+        lead.confidence = min(100, lead.confidence + 5)
+    return True
+
+
+def is_official_lead(lead: Lead, config: SearchConfig | None = None) -> bool:
+    haystack = f"{lead.title} {lead.url} {lead.snippet} {lead.source}".lower()
+    parsed = urllib.parse.urlparse(lead.url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    if config and any(site.lower() in host for site in config.source_sites):
+        return True
+    if any(hint in haystack for hint in REPOST_HINTS):
+        return False
+    return any(hint in haystack for hint in OFFICIAL_HINTS)
+
+
+def domain_company(company: str) -> str:
+    return re.sub(r"\s+", "", company).replace("集团", "").replace("股份", "")
 
 
 def clean_search_href(href: str) -> str:
@@ -317,6 +511,28 @@ def write_outputs(leads: list[Lead], out_dir: Path) -> None:
     print(f"wrote {md_path}")
 
 
+def write_query_plan(queries: list[str], config: SearchConfig, out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plan_path = out_dir / "query_plan.md"
+    lines = [
+        "# Campus Recruiting Query Plan",
+        "",
+        f"- Roles: {', '.join(config.roles) or '(any)'}",
+        f"- Cities: {', '.join(config.cities) or '(any)'}",
+        f"- Graduation years: {', '.join(config.graduation_years) or '(any)'}",
+        f"- Target companies: {', '.join(config.target_companies) or '(any)'}",
+        f"- Must-have keywords: {', '.join(config.must_have_keywords) or '(none)'}",
+        f"- Exclude keywords: {', '.join(config.exclude_keywords) or '(none)'}",
+        f"- Min confidence: {config.min_confidence}",
+        "",
+        "## Queries",
+        "",
+    ]
+    lines.extend(f"{index}. `{query}`" for index, query in enumerate(queries, start=1))
+    plan_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {plan_path}")
+
+
 def render_markdown(leads: list[Lead]) -> str:
     today = dt.date.today().isoformat()
     lines = [
@@ -383,14 +599,30 @@ def load_input(path: Path) -> list[Lead]:
 
 def collect(args: argparse.Namespace) -> int:
     leads: list[Lead] = []
-    for query in args.query:
+    queries = list(args.query)
+    urls = list(args.url)
+    out_dir = Path(args.out_dir)
+    limit_per_query = args.limit_per_query
+    active_config: SearchConfig | None = None
+    if args.config:
+        active_config = load_config(Path(args.config))
+        queries.extend(queries_from_config(active_config))
+        urls.extend(active_config.direct_urls)
+        if args.out_dir == "out":
+            out_dir = Path(active_config.output_dir)
+        if args.limit_per_query == 12:
+            limit_per_query = active_config.limit_per_query
+        write_query_plan(queries, active_config, out_dir)
+    for query in queries:
         expanded = " ".join(part for part in [query, args.role, args.city] if part)
-        leads.extend(search_bing(expanded, limit=args.limit_per_query))
+        leads.extend(search_bing(expanded, limit=limit_per_query))
         time.sleep(args.delay)
-    for url in args.url:
+    for url in urls:
         leads.append(direct_url_lead(url, company=args.company, city=args.city, role=args.role))
     normalized = dedupe(leads)
-    write_outputs(normalized, Path(args.out_dir))
+    if active_config:
+        normalized = [lead for lead in normalized if lead_matches_config(lead, active_config)]
+    write_outputs(normalized, out_dir)
     return 0
 
 
@@ -398,7 +630,14 @@ def normalize(args: argparse.Namespace) -> int:
     leads = load_input(Path(args.input))
     for lead in leads:
         score_lead(lead)
-    write_outputs(dedupe(leads), Path(args.out_dir))
+    normalized = dedupe(leads)
+    out_dir = Path(args.out_dir)
+    if args.config:
+        active_config = load_config(Path(args.config))
+        normalized = [lead for lead in normalized if lead_matches_config(lead, active_config)]
+        if args.out_dir == "out":
+            out_dir = Path(active_config.output_dir)
+    write_outputs(normalized, out_dir)
     return 0
 
 
@@ -409,6 +648,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=textwrap.dedent(
             """
             Examples:
+              campus_jobs.py collect --config config.json
               campus_jobs.py collect --query "AI 2026 campus recruiting Shanghai" --out-dir out
               campus_jobs.py collect --url https://company.example/campus --company Example --out-dir out
               campus_jobs.py normalize --input raw-links.json --out-dir out
@@ -418,6 +658,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     collect_parser = subparsers.add_parser("collect")
+    collect_parser.add_argument("--config", help="Filtering config JSON.")
     collect_parser.add_argument("--query", action="append", default=[], help="Search query to run.")
     collect_parser.add_argument("--url", action="append", default=[], help="Direct campus/career URL to fetch.")
     collect_parser.add_argument("--company", default="", help="Company hint for direct URLs.")
@@ -430,6 +671,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.add_argument("--input", required=True, help="JSON list of URLs or lead objects.")
+    normalize_parser.add_argument("--config", help="Filtering config JSON.")
     normalize_parser.add_argument("--out-dir", default="out")
     normalize_parser.set_defaults(func=normalize)
     return parser
@@ -438,8 +680,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "collect" and not args.query and not args.url:
-        parser.error("collect requires at least one --query or --url")
+    if args.command == "collect" and not args.query and not args.url and not args.config:
+        parser.error("collect requires at least one --query, --url, or --config")
     return args.func(args)
 
 

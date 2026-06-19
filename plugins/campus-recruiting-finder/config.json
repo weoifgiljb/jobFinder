@@ -1,0 +1,32 @@
+{
+  "profile_name": "default-campus-job-search",
+  "languages": ["zh", "en"],
+  "filters": {
+    "graduation_years": ["2026届", "2026"],
+    "roles": [],
+    "cities": [],
+    "industries": [],
+    "target_companies": [],
+    "company_aliases": {},
+    "keywords": ["校招", "应届生", "new grad", "early career"],
+    "must_have_keywords": [],
+    "nice_to_have_keywords": [],
+    "exclude_keywords": ["外包", "培训班", "社招"],
+    "degrees": [],
+    "employment_types": ["全职", "校招", "new grad"],
+    "include_internships": false,
+    "include_reposts": true,
+    "remote_ok": false
+  },
+  "sources": {
+    "sites": [],
+    "direct_urls": []
+  },
+  "output": {
+    "dir": "out",
+    "min_confidence": 35,
+    "limit_per_query": 12,
+    "max_queries": 80
+  },
+  "notes": "让 Codex 按你的目标补全 roles、cities、industries、target_companies 和 sources。"
+}
