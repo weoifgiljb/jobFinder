@@ -17,11 +17,12 @@
     "keywords": ["校招", "应届生", "new grad", "early career"],
     "must_have_keywords": [],
     "nice_to_have_keywords": ["大模型", "LLM", "机器学习", "Python"],
-    "exclude_keywords": ["销售", "客服", "外包", "社招"],
+    "exclude_keywords": ["销售", "客服", "外包", "社招", "boss", "BOSS直聘", "zhipin", "看准", "猎聘", "拉勾", "智联招聘", "前程无忧"],
     "degrees": ["本科", "硕士"],
     "employment_types": ["全职", "校招", "new grad"],
     "include_internships": false,
-    "include_reposts": true,
+    "include_reposts": false,
+    "official_only": true,
     "remote_ok": false
   },
   "sources": {

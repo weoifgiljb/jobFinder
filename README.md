@@ -11,6 +11,7 @@
 - 支持中文和英文关键词，适合互联网、AI、算法、后端、产品、数据分析等方向。
 - 支持 `config.json` 固化你的职业筛选条件，并让 Codex 通过问答辅助填写。
 - 支持每日自动化扫描，只推送新增的官网/招聘官网岗位线索。
+- 默认只看企业官网、校招官网或公司招聘官网，不使用 Boss 直聘等第三方招聘平台。
 
 ## 目录结构
 
@@ -91,6 +92,8 @@ plugins/campus-recruiting-finder/config.json
 - `degrees`：学历要求，例如 `本科`、`硕士`。
 - `employment_types`：岗位类型，例如 `全职`、`校招`、`new grad`。
 - `include_internships`：是否包含实习或实习转正机会。
+- `include_reposts`：是否保留转载或第三方招聘平台线索，默认 `false`。
+- `official_only`：是否只保留官网/招聘官网线索，默认 `true`。
 - `remote_ok`：是否接受远程、全国或多地岗位。
 - `sources.sites`：重点搜索的招聘站点域名。
 - `sources.direct_urls`：已知招聘入口链接。
@@ -136,7 +139,7 @@ python .\scripts\campus_jobs.py normalize --input raw-links.json --config .\conf
 
 ## 每日自动推送
 
-日报脚本会读取 `config.json`，搜索符合条件的校招信息，只保留官网或招聘官网倾向的线索，并用 `seen.json` 记录历史，避免每天重复推同一个链接。
+日报脚本会读取 `config.json`，搜索符合条件的校招信息，只保留官网或招聘官网倾向的线索，并用 `seen.json` 记录历史，避免每天重复推同一个链接。默认会排除 Boss 直聘、猎聘、拉勾、智联招聘、前程无忧、看准、牛客、应届生求职网等第三方或转载来源。
 
 从插件目录运行：
 

@@ -11,11 +11,12 @@
     "keywords": ["校招", "应届生", "new grad", "early career"],
     "must_have_keywords": [],
     "nice_to_have_keywords": [],
-    "exclude_keywords": ["外包", "培训班", "社招"],
+    "exclude_keywords": ["外包", "培训班", "社招", "boss", "BOSS直聘", "zhipin", "看准", "猎聘", "拉勾", "智联招聘", "前程无忧"],
     "degrees": [],
     "employment_types": ["全职", "校招", "new grad"],
     "include_internships": false,
-    "include_reposts": true,
+    "include_reposts": false,
+    "official_only": true,
     "remote_ok": false
   },
   "sources": {

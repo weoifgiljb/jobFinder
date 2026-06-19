@@ -22,6 +22,7 @@ Ask concise questions only for missing decision fields:
 7. Must-have and nice-to-have keywords: for example `大模型`, `LLM`, `Python`, `C++`.
 8. Exclusions: roles, industries, cities, or sources to avoid.
 9. Internship preference: whether internships or internship-to-full-time postings count.
+10. Source preference: default to official company career/campus sites only; do not use Boss/Zhipin, Liepin, Lagou, 51job, Zhaopin, or repost platforms unless the user explicitly asks.
 
 After collecting answers, update `config.json` with valid JSON. Keep user-provided Chinese text unchanged. Preserve existing fields that the user did not change.
 
@@ -85,6 +86,7 @@ The daily digest keeps `seen.json`, filters for official-looking career/campus l
 - `filters.employment_types`: full-time, internship, or new-grad labels.
 - `filters.include_internships`: include internship and internship-to-full-time roles.
 - `filters.include_reposts`: keep non-official repost sources as leads.
+- `filters.official_only`: require official-looking company career/campus links.
 - `filters.remote_ok`: accept remote, national, or multi-city postings.
 - `sources.sites`: domains to search with `site:`.
 - `sources.direct_urls`: known career/campus URLs to fetch directly.
@@ -101,7 +103,7 @@ Include links to sources. Add a short "Next actions" section with application st
 
 ## Quality Rules
 
-- Prefer official application links over reposts.
+- Prefer official application links over reposts. If `official_only` is true, exclude Boss/Zhipin, Liepin, Lagou, 51job, Zhaopin, KanZhun, LinkedIn, NowCoder, YingJieSheng, and similar third-party/repost platforms.
 - For daily pushes, include only new official-looking career/campus links unless the user explicitly asks for reposts.
 - Keep reposts only when they reveal a lead not yet found on an official page, and label them as reposts.
 - Treat stale pages from previous recruiting years as historical unless the page clearly covers the user's target year.

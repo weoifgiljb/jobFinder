@@ -68,9 +68,17 @@ REPOST_HINTS = [
     "应届生求职",
     "kanzhun",
     "boss",
+    "boss直聘",
+    "zhipin.com",
     "liepin",
     "zhipin",
     "linkedin",
+    "lagou",
+    "拉勾",
+    "51job",
+    "前程无忧",
+    "智联招聘",
+    "zhaopin.com",
 ]
 
 
@@ -108,6 +116,7 @@ class SearchConfig:
     languages: list[str]
     include_internships: bool
     include_reposts: bool
+    official_only: bool
     remote_ok: bool
     min_confidence: int
     limit_per_query: int
@@ -227,6 +236,7 @@ def load_config(path: Path) -> SearchConfig:
         languages=list_of_strings(raw.get("languages")) or ["zh", "en"],
         include_internships=bool(filters.get("include_internships", False)),
         include_reposts=bool(filters.get("include_reposts", True)),
+        official_only=bool(filters.get("official_only", False)),
         remote_ok=bool(filters.get("remote_ok", False)),
         min_confidence=int(output.get("min_confidence", 35)),
         limit_per_query=int(output.get("limit_per_query", 12)),
@@ -321,6 +331,8 @@ def compact_query(parts: Iterable[str]) -> str:
 def lead_matches_config(lead: Lead, config: SearchConfig) -> bool:
     haystack = f"{lead.title} {lead.url} {lead.snippet} {lead.company} {lead.role} {lead.city}".lower()
     if lead.confidence < config.min_confidence:
+        return False
+    if config.official_only and not is_official_lead(lead, config):
         return False
     if not config.include_reposts and any(hint in haystack for hint in REPOST_HINTS):
         return False
