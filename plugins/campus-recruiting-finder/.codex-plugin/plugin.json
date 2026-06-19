@@ -1,0 +1,27 @@
+{
+  "name": "campus-recruiting-finder",
+  "version": "0.1.0+codex.20260619025913",
+  "description": "Find, verify, deduplicate, and summarize campus recruiting opportunities for new graduates.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Campus Recruiting Finder",
+    "shortDescription": "Collect verified campus recruiting leads.",
+    "longDescription": "Finds and organizes new graduate campus recruiting information from company career sites, university employment boards, and current web search results. It helps verify deadlines, locations, eligibility, source links, and follow-up actions.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Web Research",
+      "Data Extraction",
+      "Export"
+    ],
+    "defaultPrompt": [
+      "\u5e2e\u6211\u641c\u96c6\u4e92\u8054\u7f51/AI\u65b9\u5411\u76842026\u5c4a\u6821\u62db\u5c97\u4f4d",
+      "\u6309\u57ce\u5e02\u6574\u7406\u6700\u8fd1\u4ecd\u53ef\u6295\u9012\u7684\u6821\u62db\u4fe1\u606f",
+      "\u6838\u9a8c\u8fd9\u4e9b\u516c\u53f8\u7684\u5e94\u5c4a\u751f\u62db\u8058\u5165\u53e3\u548c\u622a\u6b62\u65e5\u671f"
+    ],
+    "brandColor": "#2563EB"
+  }
+}
